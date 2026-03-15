@@ -1,4 +1,4 @@
-function ExpenseRow({ expense, onDelete }) {
+function ExpenseRow({ expense, onDelete, onEdit }) {
   const date  = new Date(expense.date);
   const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const cat   = CAT_MAP[expense.category] || CAT_MAP['other'];
@@ -15,8 +15,15 @@ function ExpenseRow({ expense, onDelete }) {
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
         <span className="text-sm font-semibold text-white">${Number(expense.amount).toFixed(2)}</span>
+        <button
+          onClick={() => onEdit(expense)}
+          className="text-slate-700 hover:text-indigo-400 transition-colors opacity-0 group-hover:opacity-100"
+          title="Edit"
+        >
+          <EditIcon />
+        </button>
         <button
           onClick={() => onDelete(expense.id)}
           className="text-slate-700 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100"

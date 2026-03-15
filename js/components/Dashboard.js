@@ -1,22 +1,54 @@
 const { useState: useStateDash, useEffect: useEffectDash } = React;
 
+function toMonthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabel(key) {
+  const [y, m] = key.split('-');
+  const d = new Date(Number(y), Number(m) - 1, 1);
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function prevMonth(key) {
+  const [y, m] = key.split('-').map(Number);
+  const d = new Date(y, m - 2, 1);
+  return toMonthKey(d);
+}
+
+function nextMonth(key) {
+  const [y, m] = key.split('-').map(Number);
+  const d = new Date(y, m, 1);
+  return toMonthKey(d);
+}
+
 function Dashboard({ username, onLogout }) {
-  const [data,        setData]        = useStateDash(() => loadUserData(username));
-  const [itemName,    setItemName]    = useStateDash('');
-  const [price,       setPrice]       = useStateDash('');
-  const [category,    setCategory]    = useStateDash('food');
-  const [showSettings,setShowSettings]= useStateDash(false);
-  const [shake,       setShake]       = useStateDash(false);
-  const [tab,         setTab]         = useStateDash('recent');
+  const [data,           setData]           = useStateDash(() => {
+    const d = loadUserData(username);
+    if (!d.categoryBudgets) d.categoryBudgets = {};
+    return d;
+  });
+  const [itemName,       setItemName]       = useStateDash('');
+  const [price,          setPrice]          = useStateDash('');
+  const [category,       setCategory]       = useStateDash('food');
+  const [showSettings,   setShowSettings]   = useStateDash(false);
+  const [shake,          setShake]          = useStateDash(false);
+  const [tab,            setTab]            = useStateDash('recent');
+  const [selectedMonth,  setSelectedMonth]  = useStateDash(() => toMonthKey(new Date()));
+  const [editingExpense, setEditingExpense] = useStateDash(null);
 
   useEffectDash(() => { saveUserData(username, data); }, [data]);
 
-  const { budget, income, expenses } = data;
-  const totalSpent = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const { budget, income, expenses, categoryBudgets } = data;
+  const currentMonth = toMonthKey(new Date());
+
+  const filteredExpenses = expenses.filter(e => e.date.startsWith(selectedMonth));
+
+  const totalSpent = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0);
   const remaining  = budget - totalSpent;
   const savings    = income > 0 ? income - totalSpent : null;
   const pct        = budget > 0 ? (totalSpent / budget) * 100 : 0;
-  const recent5    = [...expenses].reverse().slice(0, 5);
+  const recent5    = [...filteredExpenses].reverse().slice(0, 5);
 
   let statusText, statusColor;
   if      (pct < 50) { statusText = 'Looking good!';    statusColor = 'text-emerald-400'; }
@@ -30,7 +62,11 @@ function Dashboard({ username, onLogout }) {
     if (!trimName || isNaN(amt) || amt <= 0) {
       setShake(true); setTimeout(() => setShake(false), 500); return;
     }
-    const entry = { id: Date.now(), name: trimName, amount: amt, category, date: new Date().toISOString() };
+    // Use first day of selectedMonth + current time so the expense lands in the right month
+    const now = new Date();
+    const [sy, sm] = selectedMonth.split('-').map(Number);
+    const entryDate = new Date(sy, sm - 1, now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds());
+    const entry = { id: Date.now(), name: trimName, amount: amt, category, date: entryDate.toISOString() };
     setData(prev => ({ ...prev, expenses: [...prev.expenses, entry] }));
     setItemName(''); setPrice('');
   }
@@ -39,8 +75,16 @@ function Dashboard({ username, onLogout }) {
     setData(prev => ({ ...prev, expenses: prev.expenses.filter(e => e.id !== id) }));
   }
 
-  function handleSettingsSave(newBudget, newIncome) {
-    setData(prev => ({ ...prev, budget: newBudget, income: newIncome }));
+  function updateExpense(id, fields) {
+    setData(prev => ({
+      ...prev,
+      expenses: prev.expenses.map(e => e.id === id ? { ...e, ...fields } : e)
+    }));
+    setEditingExpense(null);
+  }
+
+  function handleSettingsSave(newBudget, newIncome, newCatBudgets) {
+    setData(prev => ({ ...prev, budget: newBudget, income: newIncome, categoryBudgets: newCatBudgets }));
     setShowSettings(false);
   }
 
@@ -48,7 +92,7 @@ function Dashboard({ username, onLogout }) {
     <div className="min-h-screen bg-[#0f1117] flex flex-col items-center px-4 py-10">
 
       {/* Header */}
-      <div className="w-full max-w-lg flex items-center justify-between mb-8">
+      <div className="w-full max-w-lg flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-white">SpendCheck</h1>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -65,6 +109,24 @@ function Dashboard({ username, onLogout }) {
             <LogoutIcon /> Sign out
           </button>
         </div>
+      </div>
+
+      {/* Month Navigator */}
+      <div className="w-full max-w-lg flex items-center justify-between mb-4 px-1">
+        <button
+          onClick={() => setSelectedMonth(prevMonth(selectedMonth))}
+          className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#1a1d27] border border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition-colors text-sm"
+        >
+          ‹
+        </button>
+        <span className="text-sm font-semibold text-slate-300">{monthLabel(selectedMonth)}</span>
+        <button
+          onClick={() => setSelectedMonth(nextMonth(selectedMonth))}
+          disabled={selectedMonth >= currentMonth}
+          className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#1a1d27] border border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition-colors text-sm disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          ›
+        </button>
       </div>
 
       {/* Hero Card */}
@@ -141,11 +203,11 @@ function Dashboard({ username, onLogout }) {
         </form>
       </div>
 
-      {/* History / Breakdown Card */}
+      {/* History / Breakdown / Trends Card */}
       <div className="w-full max-w-lg bg-[#1a1d27] border border-slate-800 rounded-2xl p-6 shadow-xl">
         <div className="flex items-center justify-between mb-5">
           <div className="flex bg-[#0f1117] rounded-lg p-1 gap-1">
-            {[['recent', 'Recent'], ['breakdown', 'By Category']].map(([id, lbl]) => (
+            {[['recent', 'Recent'], ['breakdown', 'By Category'], ['trends', 'Trends']].map(([id, lbl]) => (
               <button
                 key={id}
                 onClick={() => setTab(id)}
@@ -157,8 +219,8 @@ function Dashboard({ username, onLogout }) {
               </button>
             ))}
           </div>
-          {expenses.length > 0 && (
-            <span className="text-xs text-slate-600">{expenses.length} expense{expenses.length !== 1 ? 's' : ''}</span>
+          {tab !== 'trends' && filteredExpenses.length > 0 && (
+            <span className="text-xs text-slate-600">{filteredExpenses.length} expense{filteredExpenses.length !== 1 ? 's' : ''}</span>
           )}
         </div>
 
@@ -170,11 +232,15 @@ function Dashboard({ username, onLogout }) {
             </div>
           ) : (
             <div className="space-y-2">
-              {recent5.map(exp => <ExpenseRow key={exp.id} expense={exp} onDelete={deleteExpense} />)}
+              {recent5.map(exp => (
+                <ExpenseRow key={exp.id} expense={exp} onDelete={deleteExpense} onEdit={setEditingExpense} />
+              ))}
             </div>
           )
+        ) : tab === 'breakdown' ? (
+          <CategoryBreakdown expenses={filteredExpenses} categoryBudgets={categoryBudgets} />
         ) : (
-          <CategoryBreakdown expenses={expenses} />
+          <TrendsChart expenses={expenses} selectedMonth={selectedMonth} />
         )}
       </div>
 
@@ -184,8 +250,17 @@ function Dashboard({ username, onLogout }) {
         <SettingsModal
           budget={budget}
           income={income}
+          categoryBudgets={categoryBudgets || {}}
           onSave={handleSettingsSave}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {editingExpense && (
+        <EditExpenseModal
+          expense={editingExpense}
+          onSave={updateExpense}
+          onClose={() => setEditingExpense(null)}
         />
       )}
     </div>
