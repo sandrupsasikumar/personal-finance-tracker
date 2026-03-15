@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SpendCheck</title>
+
+  <!-- Styles -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    @keyframes shake {
+      0%, 100% { transform: translateX(0);   }
+      20%       { transform: translateX(-6px); }
+      40%       { transform: translateX(6px);  }
+      60%       { transform: translateX(-4px); }
+      80%       { transform: translateX(4px);  }
+    }
+    .shake { animation: shake 0.4s ease-in-out; }
+  </style>
+
+  <!-- React + Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-[#0f1117] text-white font-sans min-h-screen">
+  <div id="root"></div>
+
+  <!--
+    Scripts are loaded in dependency order.
+    Each file exposes its exports via window.* so subsequent files can reference them.
+  -->
+
+  <!-- 1. Data & utilities -->
+  <script type="text/babel" src="js/constants.js"></script>
+  <script type="text/babel" src="js/storage.js"></script>
+
+  <!-- 2. Primitive UI components -->
+  <script type="text/babel" src="js/components/Icons.js"></script>
+  <script type="text/babel" src="js/components/ProgressBar.js"></script>
+  <script type="text/babel" src="js/components/InputField.js"></script>
+
+  <!-- 3. Feature components (depend on primitives + constants) -->
+  <script type="text/babel" src="js/components/CategoryPicker.js"></script>
+  <script type="text/babel" src="js/components/ExpenseRow.js"></script>
+  <script type="text/babel" src="js/components/CategoryBreakdown.js"></script>
+  <script type="text/babel" src="js/components/SettingsModal.js"></script>
+
+  <!-- 4. Pages (depend on feature components + storage) -->
+  <script type="text/babel" src="js/components/AuthPage.js"></script>
+  <script type="text/babel" src="js/components/Dashboard.js"></script>
+
+  <!-- 5. Root app -->
+  <script type="text/babel" src="js/App.js"></script>
+</body>
+</html>
