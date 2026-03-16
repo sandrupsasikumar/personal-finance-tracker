@@ -1,5 +1,7 @@
 # SpendCheck — Personal Finance Tracker
 
+**Live site:** https://sandrupsasikumar.github.io/personal-finance-tracker/
+
 A lightweight, client-side personal finance tracker built with React, Tailwind CSS, and localStorage. No backend, no build step — just open `index.html` in a browser.
 
 ---
