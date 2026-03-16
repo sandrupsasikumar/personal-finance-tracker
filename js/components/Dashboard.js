@@ -23,23 +23,29 @@ function nextMonth(key) {
 }
 
 function Dashboard({ username, onLogout }) {
-  const [data,           setData]           = useStateDash(() => {
+  const [data,            setData]            = useStateDash(() => {
     const d = loadUserData(username);
-    if (!d.categoryBudgets) d.categoryBudgets = {};
+    if (!d.categoryBudgets)  d.categoryBudgets  = {};
+    if (!d.recurring)         d.recurring         = [];
+    if (!d.recurringApplied)  d.recurringApplied  = {};
     return d;
   });
-  const [itemName,       setItemName]       = useStateDash('');
-  const [price,          setPrice]          = useStateDash('');
-  const [category,       setCategory]       = useStateDash('food');
-  const [showSettings,   setShowSettings]   = useStateDash(false);
-  const [shake,          setShake]          = useStateDash(false);
-  const [tab,            setTab]            = useStateDash('recent');
-  const [selectedMonth,  setSelectedMonth]  = useStateDash(() => toMonthKey(new Date()));
-  const [editingExpense, setEditingExpense] = useStateDash(null);
+  const [itemName,        setItemName]        = useStateDash('');
+  const [price,           setPrice]           = useStateDash('');
+  const [category,        setCategory]        = useStateDash('food');
+  const [showSettings,    setShowSettings]    = useStateDash(false);
+  const [shake,           setShake]           = useStateDash(false);
+  const [tab,             setTab]             = useStateDash('recent');
+  const [selectedMonth,   setSelectedMonth]   = useStateDash(() => toMonthKey(new Date()));
+  const [editingExpense,  setEditingExpense]  = useStateDash(null);
+  const [showRecurring,   setShowRecurring]   = useStateDash(false);
+  const [searchQuery,     setSearchQuery]     = useStateDash('');
+  const [showAllExpenses, setShowAllExpenses] = useStateDash(false);
+  const [nudgeDismissed,  setNudgeDismissed]  = useStateDash(false);
 
   useEffectDash(() => { saveUserData(username, data); }, [data]);
 
-  const { budget, income, expenses, categoryBudgets } = data;
+  const { budget, income, expenses, categoryBudgets, recurring, recurringApplied } = data;
   const currentMonth = toMonthKey(new Date());
 
   const filteredExpenses = expenses.filter(e => e.date.startsWith(selectedMonth));
@@ -48,12 +54,25 @@ function Dashboard({ username, onLogout }) {
   const remaining  = budget - totalSpent;
   const savings    = income > 0 ? income - totalSpent : null;
   const pct        = budget > 0 ? (totalSpent / budget) * 100 : 0;
-  const recent5    = [...filteredExpenses].reverse().slice(0, 5);
+
+  // Search + show-all logic
+  const searchedExpenses = [...filteredExpenses]
+    .reverse()
+    .filter(e =>
+      e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (CAT_MAP[e.category]?.label || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  const displayedExpenses = showAllExpenses ? searchedExpenses : searchedExpenses.slice(0, 5);
 
   let statusText, statusColor;
   if      (pct < 50) { statusText = 'Looking good!';    statusColor = 'text-emerald-400'; }
   else if (pct < 80) { statusText = 'Watch your spend'; statusColor = 'text-amber-400';   }
   else               { statusText = 'Budget alert!';    statusColor = 'text-rose-400';    }
+
+  const showNudge = selectedMonth === currentMonth
+    && recurring.length > 0
+    && !recurringApplied[selectedMonth]
+    && !nudgeDismissed;
 
   function addExpense(e) {
     e.preventDefault();
@@ -62,7 +81,6 @@ function Dashboard({ username, onLogout }) {
     if (!trimName || isNaN(amt) || amt <= 0) {
       setShake(true); setTimeout(() => setShake(false), 500); return;
     }
-    // Use first day of selectedMonth + current time so the expense lands in the right month
     const now = new Date();
     const [sy, sm] = selectedMonth.split('-').map(Number);
     const entryDate = new Date(sy, sm - 1, now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds());
@@ -86,6 +104,41 @@ function Dashboard({ username, onLogout }) {
   function handleSettingsSave(newBudget, newIncome, newCatBudgets) {
     setData(prev => ({ ...prev, budget: newBudget, income: newIncome, categoryBudgets: newCatBudgets }));
     setShowSettings(false);
+  }
+
+  function addRecurringTemplate(template) {
+    setData(prev => ({ ...prev, recurring: [...prev.recurring, { ...template, id: Date.now() }] }));
+  }
+
+  function deleteRecurringTemplate(id) {
+    setData(prev => ({ ...prev, recurring: prev.recurring.filter(r => r.id !== id) }));
+  }
+
+  function applyRecurring(month) {
+    const [sy, sm] = month.split('-').map(Number);
+    const baseTime = new Date(sy, sm - 1, 1).getTime();
+    const entries = recurring.map((r, i) => ({
+      id: baseTime + i,
+      name: r.name,
+      amount: r.amount,
+      category: r.category,
+      date: new Date(sy, sm - 1, 1).toISOString(),
+      fromRecurring: true,
+    }));
+    setData(prev => ({
+      ...prev,
+      expenses: [...prev.expenses, ...entries],
+      recurringApplied: { ...prev.recurringApplied, [month]: true },
+    }));
+    setShowRecurring(false);
+    setNudgeDismissed(true);
+  }
+
+  function changeMonth(key) {
+    setSelectedMonth(key);
+    setShowAllExpenses(false);
+    setSearchQuery('');
+    setNudgeDismissed(false);
   }
 
   return (
@@ -114,14 +167,14 @@ function Dashboard({ username, onLogout }) {
       {/* Month Navigator */}
       <div className="w-full max-w-lg flex items-center justify-between mb-4 px-1">
         <button
-          onClick={() => setSelectedMonth(prevMonth(selectedMonth))}
+          onClick={() => changeMonth(prevMonth(selectedMonth))}
           className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#1a1d27] border border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition-colors text-sm"
         >
           ‹
         </button>
         <span className="text-sm font-semibold text-slate-300">{monthLabel(selectedMonth)}</span>
         <button
-          onClick={() => setSelectedMonth(nextMonth(selectedMonth))}
+          onClick={() => changeMonth(nextMonth(selectedMonth))}
           disabled={selectedMonth >= currentMonth}
           className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#1a1d27] border border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition-colors text-sm disabled:opacity-30 disabled:cursor-not-allowed"
         >
@@ -185,9 +238,40 @@ function Dashboard({ username, onLogout }) {
         )}
       </div>
 
+      {/* Recurring nudge banner */}
+      {showNudge && (
+        <div className="w-full max-w-lg bg-[#1a1d27] border border-indigo-900/60 rounded-2xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
+          <p className="text-sm text-slate-300">
+            🔁 <span className="font-medium">{recurring.length}</span> recurring expense{recurring.length !== 1 ? 's' : ''} — apply to {monthLabel(selectedMonth)}?
+          </p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => applyRecurring(selectedMonth)}
+              className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Apply
+            </button>
+            <button
+              onClick={() => setNudgeDismissed(true)}
+              className="text-slate-600 hover:text-slate-400 transition-colors text-base leading-none"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Add Expense Card */}
       <div className="w-full max-w-lg bg-[#1a1d27] border border-slate-800 rounded-2xl p-6 mb-4 shadow-xl">
-        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Add Expense</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Add Expense</h2>
+          <button
+            onClick={() => setShowRecurring(true)}
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-400 transition-colors"
+          >
+            🔁 Recurring{recurring.length > 0 && <span className="text-indigo-500">({recurring.length})</span>}
+          </button>
+        </div>
         <form onSubmit={addExpense} className={`space-y-4 ${shake ? 'shake' : ''}`}>
           <div className="grid grid-cols-2 gap-3">
             <InputField placeholder="Item name (e.g. Coffee)" value={itemName} onChange={e => setItemName(e.target.value)} />
@@ -225,18 +309,60 @@ function Dashboard({ username, onLogout }) {
         </div>
 
         {tab === 'recent' ? (
-          recent5.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-slate-600 text-sm">No expenses yet.</p>
-              <p className="text-slate-700 text-xs mt-1">Add your first one above!</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {recent5.map(exp => (
-                <ExpenseRow key={exp.id} expense={exp} onDelete={deleteExpense} onEdit={setEditingExpense} />
-              ))}
-            </div>
-          )
+          <div>
+            {/* Search bar */}
+            {filteredExpenses.length > 0 && (
+              <div className="relative mb-3">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs pointer-events-none">🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search expenses…"
+                  value={searchQuery}
+                  onChange={e => { setSearchQuery(e.target.value); setShowAllExpenses(false); }}
+                  className="w-full bg-[#0f1117] border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-slate-600 transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400 transition-colors text-base leading-none"
+                  >
+                    &times;
+                  </button>
+                )}
+              </div>
+            )}
+
+            {searchedExpenses.length === 0 ? (
+              <div className="text-center py-8">
+                {searchQuery ? (
+                  <p className="text-slate-600 text-sm">No results for "{searchQuery}".</p>
+                ) : (
+                  <>
+                    <p className="text-slate-600 text-sm">No expenses yet.</p>
+                    <p className="text-slate-700 text-xs mt-1">Add your first one above!</p>
+                  </>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {displayedExpenses.map(exp => (
+                    <ExpenseRow key={exp.id} expense={exp} onDelete={deleteExpense} onEdit={setEditingExpense} />
+                  ))}
+                </div>
+                {searchedExpenses.length > 5 && (
+                  <button
+                    onClick={() => setShowAllExpenses(p => !p)}
+                    className="mt-3 w-full text-xs text-slate-500 hover:text-slate-300 transition-colors py-2 border-t border-slate-800"
+                  >
+                    {showAllExpenses
+                      ? 'Show less ↑'
+                      : `Show all ${searchedExpenses.length} expenses ↓`}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         ) : tab === 'breakdown' ? (
           <CategoryBreakdown expenses={filteredExpenses} categoryBudgets={categoryBudgets} />
         ) : (
@@ -261,6 +387,18 @@ function Dashboard({ username, onLogout }) {
           expense={editingExpense}
           onSave={updateExpense}
           onClose={() => setEditingExpense(null)}
+        />
+      )}
+
+      {showRecurring && (
+        <RecurringModal
+          recurring={recurring}
+          recurringApplied={recurringApplied}
+          selectedMonth={selectedMonth}
+          onAddTemplate={addRecurringTemplate}
+          onDeleteTemplate={deleteRecurringTemplate}
+          onApply={applyRecurring}
+          onClose={() => setShowRecurring(false)}
         />
       )}
     </div>
