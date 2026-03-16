@@ -4,6 +4,7 @@ function EditExpenseModal({ expense, onSave, onClose }) {
   const [name,     setName]     = useStateEdit(expense.name);
   const [amount,   setAmount]   = useStateEdit(String(expense.amount));
   const [category, setCategory] = useStateEdit(expense.category);
+  const [notes,    setNotes]    = useStateEdit(expense.notes || '');
   const [shake,    setShake]    = useStateEdit(false);
 
   function handleSubmit(e) {
@@ -13,7 +14,7 @@ function EditExpenseModal({ expense, onSave, onClose }) {
     if (!trimName || isNaN(amt) || amt <= 0) {
       setShake(true); setTimeout(() => setShake(false), 500); return;
     }
-    onSave(expense.id, { name: trimName, amount: amt, category });
+    onSave(expense.id, { name: trimName, amount: amt, category, notes: notes.trim() });
   }
 
   return (
@@ -31,6 +32,13 @@ function EditExpenseModal({ expense, onSave, onClose }) {
             <p className="text-xs text-slate-400 font-medium mb-2">Category</p>
             <CategoryPicker value={category} onChange={setCategory} />
           </div>
+          <input
+            type="text"
+            placeholder="Notes (optional)"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            className="w-full bg-[#0f1117] border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+          />
           <div className="flex gap-3 pt-1">
             <button
               type="button"

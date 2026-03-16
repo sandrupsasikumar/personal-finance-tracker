@@ -13,6 +13,9 @@ function ExpenseRow({ expense, onDelete, onEdit }) {
             <span className="text-xs text-slate-500">{label}</span>
             <span className={`text-xs font-medium ${cat.text}`}>{cat.label}</span>
           </div>
+          {expense.notes && (
+            <p className="text-xs text-slate-600 italic truncate mt-0.5">{expense.notes}</p>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0 ml-3">

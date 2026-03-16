@@ -42,6 +42,7 @@ function Dashboard({ username, onLogout }) {
   const [searchQuery,     setSearchQuery]     = useStateDash('');
   const [showAllExpenses, setShowAllExpenses] = useStateDash(false);
   const [nudgeDismissed,  setNudgeDismissed]  = useStateDash(false);
+  const [notes,           setNotes]           = useStateDash('');
 
   useEffectDash(() => { saveUserData(username, data); }, [data]);
 
@@ -54,6 +55,17 @@ function Dashboard({ username, onLogout }) {
   const remaining  = budget - totalSpent;
   const savings    = income > 0 ? income - totalSpent : null;
   const pct        = budget > 0 ? (totalSpent / budget) * 100 : 0;
+
+  // Budget forecast (current month only)
+  let forecast = null;
+  if (selectedMonth === currentMonth && filteredExpenses.length > 0) {
+    const now         = new Date();
+    const dayOfMonth  = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dailyAvg    = totalSpent / dayOfMonth;
+    const projected   = Math.round(dailyAvg * daysInMonth * 100) / 100;
+    forecast = { projected };
+  }
 
   // Search + show-all logic
   const searchedExpenses = [...filteredExpenses]
@@ -84,9 +96,9 @@ function Dashboard({ username, onLogout }) {
     const now = new Date();
     const [sy, sm] = selectedMonth.split('-').map(Number);
     const entryDate = new Date(sy, sm - 1, now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds());
-    const entry = { id: Date.now(), name: trimName, amount: amt, category, date: entryDate.toISOString() };
+    const entry = { id: Date.now(), name: trimName, amount: amt, category, date: entryDate.toISOString(), notes: notes.trim() };
     setData(prev => ({ ...prev, expenses: [...prev.expenses, entry] }));
-    setItemName(''); setPrice('');
+    setItemName(''); setPrice(''); setNotes('');
   }
 
   function deleteExpense(id) {
@@ -132,6 +144,25 @@ function Dashboard({ username, onLogout }) {
     }));
     setShowRecurring(false);
     setNudgeDismissed(true);
+  }
+
+  function exportCSV() {
+    const rows = [['Date', 'Name', 'Amount', 'Category', 'Notes']];
+    [...filteredExpenses]
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .forEach(e => {
+        const cat  = CAT_MAP[e.category]?.label || e.category;
+        const date = new Date(e.date).toLocaleDateString('en-US');
+        rows.push([date, e.name, Number(e.amount).toFixed(2), cat, e.notes || '']);
+      });
+    const csv  = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `spendcheck-${selectedMonth}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   function changeMonth(key) {
@@ -195,6 +226,19 @@ function Dashboard({ username, onLogout }) {
           <span className="text-xs text-slate-600">0%</span>
           <span className="text-xs text-slate-600">{Math.round(pct)}% used</span>
         </div>
+
+        {forecast && (
+          <div className={`mt-3 flex items-center justify-between text-xs rounded-lg px-3 py-2 ${
+            forecast.projected <= budget
+              ? 'bg-emerald-950/40 text-emerald-400'
+              : forecast.projected <= budget * 1.2
+              ? 'bg-amber-950/40 text-amber-400'
+              : 'bg-rose-950/40 text-rose-400'
+          }`}>
+            <span>📈 Projected this month</span>
+            <span className="font-semibold">${forecast.projected.toFixed(2)}</span>
+          </div>
+        )}
 
         {/* Stats tiles */}
         <div className={`grid ${income > 0 ? 'grid-cols-3' : 'grid-cols-2'} gap-3 mt-4`}>
@@ -278,6 +322,13 @@ function Dashboard({ username, onLogout }) {
             <InputField prefix="$" type="number" placeholder="0.00" value={price} onChange={e => setPrice(e.target.value)} />
           </div>
           <CategoryPicker value={category} onChange={setCategory} />
+          <input
+            type="text"
+            placeholder="Notes (optional)"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            className="w-full bg-[#0f1117] border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+          />
           <button
             type="submit"
             className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold rounded-xl py-3.5 transition-all text-sm tracking-wide"
@@ -304,7 +355,16 @@ function Dashboard({ username, onLogout }) {
             ))}
           </div>
           {tab !== 'trends' && filteredExpenses.length > 0 && (
-            <span className="text-xs text-slate-600">{filteredExpenses.length} expense{filteredExpenses.length !== 1 ? 's' : ''}</span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={exportCSV}
+                className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                title="Export to CSV"
+              >
+                ↓ CSV
+              </button>
+              <span className="text-xs text-slate-600">{filteredExpenses.length} expense{filteredExpenses.length !== 1 ? 's' : ''}</span>
+            </div>
           )}
         </div>
 
