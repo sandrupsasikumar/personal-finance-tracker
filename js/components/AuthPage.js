@@ -3,6 +3,7 @@ const { useState: useStateAuth } = React;
 function AuthPage({ onLogin }) {
   const [mode,     setMode] = useStateAuth('login');
   const [username, setUser] = useStateAuth('');
+  const [email,    setEmail]= useStateAuth('');
   const [password, setPass] = useStateAuth('');
   const [error,    setError]= useStateAuth('');
   const [shake,    setShake]= useStateAuth(false);
@@ -17,14 +18,15 @@ function AuthPage({ onLogin }) {
     e.preventDefault();
     const u = username.trim().toLowerCase();
     const p = password.trim();
-    if (!u || !p) return triggerError('Please fill in both fields.');
+    if (!u || !p) return triggerError('Please fill in all required fields.');
 
     const users = getUsers();
 
     if (mode === 'register') {
-      if (users[u])    return triggerError('Username already taken.');
-      if (p.length < 4) return triggerError('Password must be at least 4 characters.');
-      users[u] = { pw: hashPw(p) };
+      if (!email.trim()) return triggerError('Please enter your email.');
+      if (users[u])      return triggerError('Username already taken.');
+      if (p.length < 4)  return triggerError('Password must be at least 4 characters.');
+      users[u] = { pw: hashPw(p), email: email.trim() };
       saveUsers(users);
       setSession(u);
       onLogin(u);
@@ -34,6 +36,12 @@ function AuthPage({ onLogin }) {
       setSession(u);
       onLogin(u);
     }
+  }
+
+  function switchMode(m) {
+    setMode(m);
+    setError('');
+    setEmail('');
   }
 
   return (
@@ -52,7 +60,7 @@ function AuthPage({ onLogin }) {
             {['login', 'register'].map(m => (
               <button
                 key={m}
-                onClick={() => { setMode(m); setError(''); }}
+                onClick={() => switchMode(m)}
                 className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
                   mode === m ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:text-slate-300'
                 }`}
@@ -63,8 +71,11 @@ function AuthPage({ onLogin }) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3">
-            <InputField label="Username"  placeholder="e.g. alex"   value={username} onChange={e => setUser(e.target.value)} autoFocus />
-            <InputField label="Password"  placeholder="••••••••"     value={password} onChange={e => setPass(e.target.value)} type="password" />
+            <InputField label="Username" placeholder="e.g. alex" value={username} onChange={e => setUser(e.target.value)} autoFocus />
+            {mode === 'register' && (
+              <InputField label="Email" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} />
+            )}
+            <InputField label="Password" placeholder="••••••••" value={password} onChange={e => setPass(e.target.value)} type="password" />
             {error && <p className="text-rose-400 text-xs font-medium pt-1">{error}</p>}
             <button
               type="submit"

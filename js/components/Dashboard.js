@@ -22,12 +22,13 @@ function nextMonth(key) {
   return toMonthKey(d);
 }
 
-function Dashboard({ username, onLogout }) {
+function Dashboard({ username, onLogout, onUsernameChange }) {
   const [data,            setData]            = useStateDash(() => {
     const d = loadUserData(username);
     if (!d.categoryBudgets)  d.categoryBudgets  = {};
     if (!d.recurring)         d.recurring         = [];
     if (!d.recurringApplied)  d.recurringApplied  = {};
+    if (d.name === undefined)  d.name             = '';
     return d;
   });
   const [itemName,        setItemName]        = useStateDash('');
@@ -43,6 +44,7 @@ function Dashboard({ username, onLogout }) {
   const [showAllExpenses, setShowAllExpenses] = useStateDash(false);
   const [nudgeDismissed,  setNudgeDismissed]  = useStateDash(false);
   const [notes,           setNotes]           = useStateDash('');
+  const [showAccount,     setShowAccount]     = useStateDash(false);
 
   useEffectDash(() => { saveUserData(username, data); }, [data]);
 
@@ -165,6 +167,23 @@ function Dashboard({ username, onLogout }) {
     URL.revokeObjectURL(url);
   }
 
+  function handleAccountSave({ name, email, newUsername, newPw }) {
+    // 1. Update display name in user data
+    setData(prev => ({ ...prev, name }));
+    // 2. Update email in user registry
+    updateUserEmail(username, email);
+    // 3. Handle password change (must happen before username rename)
+    if (newPw) {
+      changePassword(username, hashPw(newPw));
+    }
+    // 4. Handle username change last (renames data key + session)
+    if (newUsername !== username) {
+      changeUsername(username, newUsername);
+      onUsernameChange(newUsername);
+    }
+    setShowAccount(false);
+  }
+
   function changeMonth(key) {
     setSelectedMonth(key);
     setShowAllExpenses(false);
@@ -180,10 +199,17 @@ function Dashboard({ username, onLogout }) {
         <div>
           <h1 className="text-2xl font-black tracking-tight text-white">SpendCheck</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Hey, <span className="text-indigo-400 font-semibold">{username}</span> 👋
+            Hey, <span className="text-indigo-400 font-semibold">{data.name || username}</span> 👋
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowAccount(true)}
+            title="Account"
+            className="text-slate-400 hover:text-white transition-colors"
+          >
+            <PersonIcon />
+          </button>
           <GearIcon onClick={() => setShowSettings(true)} />
           <button
             onClick={onLogout}
@@ -447,6 +473,15 @@ function Dashboard({ username, onLogout }) {
           expense={editingExpense}
           onSave={updateExpense}
           onClose={() => setEditingExpense(null)}
+        />
+      )}
+
+      {showAccount && (
+        <AccountModal
+          username={username}
+          userData={data}
+          onSave={handleAccountSave}
+          onClose={() => setShowAccount(false)}
         />
       )}
 

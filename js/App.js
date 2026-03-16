@@ -7,7 +7,7 @@ function App() {
   function handleLogout()  { clearSession(); setUser(null); }
 
   if (!user) return <AuthPage onLogin={handleLogin} />;
-  return <Dashboard username={user} onLogout={handleLogout} />;
+  return <Dashboard username={user} onLogout={handleLogout} onUsernameChange={u => setUser(u)} />;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
