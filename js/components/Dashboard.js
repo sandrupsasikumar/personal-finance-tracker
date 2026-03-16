@@ -22,7 +22,7 @@ function nextMonth(key) {
   return toMonthKey(d);
 }
 
-function Dashboard({ username, onLogout, onUsernameChange }) {
+function Dashboard({ username, onLogout, onUsernameChange, onOpenSplitter }) {
   const [data,            setData]            = useStateDash(() => {
     const d = loadUserData(username);
     if (!d.categoryBudgets)  d.categoryBudgets  = {};
@@ -203,6 +203,13 @@ function Dashboard({ username, onLogout, onUsernameChange }) {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex bg-[#0f1117] border border-slate-800 rounded-lg p-1 gap-1">
+            <span className="px-3 py-1.5 rounded-md text-xs font-semibold bg-indigo-600 text-white">Budget</span>
+            <button
+              onClick={onOpenSplitter}
+              className="px-3 py-1.5 rounded-md text-xs font-semibold text-slate-500 hover:text-slate-300 transition-all"
+            >Split</button>
+          </div>
           <button
             onClick={() => setShowAccount(true)}
             title="Account"

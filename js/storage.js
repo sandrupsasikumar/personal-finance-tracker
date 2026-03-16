@@ -8,7 +8,7 @@ function setSession(u)  { sessionStorage.setItem(SESSION_KEY, u); }
 function clearSession() { sessionStorage.removeItem(SESSION_KEY); }
 
 function userDataKey(u)     { return `spendcheck_data_${u}`; }
-function defaultUserData()  { return { budget: 2000, income: 0, expenses: [], categoryBudgets: {}, recurring: [], recurringApplied: {}, name: '' }; }
+function defaultUserData()  { return { budget: 2000, income: 0, expenses: [], categoryBudgets: {}, recurring: [], recurringApplied: {}, name: '', splits: [] }; }
 function loadUserData(u)    { try { return JSON.parse(localStorage.getItem(userDataKey(u))) || defaultUserData(); } catch { return defaultUserData(); } }
 function saveUserData(u, d) { localStorage.setItem(userDataKey(u), JSON.stringify(d)); }
 
